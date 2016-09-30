@@ -78,6 +78,7 @@
       // output: CKEDITOR.htmlParser.node[]
       var wrapMacroOutput = function(startMacroComment, output) {
         var wrapperName = isInlineMacro(startMacroComment, output) ? 'span' : 'div';
+        var macroCall = macroPlugin.parseMacroCall(startMacroComment.value);
         var macroModule = null;
         if(editor.config.macroModules && editor.config.macrodules[macroCall.name]) {
           macroModule = editor.config.macrodules[macroCall.name];
@@ -93,7 +94,6 @@
             wrapper.add(output[i]);
           }
         } else {
-          var macroCall = macroPlugin.parseMacroCall(startMacroComment.value);
           var placeholder = null;
           // a macroModule may be providing the services of editing these macros
           if(macroModule) {
@@ -254,8 +254,7 @@
     // (or creates it if not a startMacro comment
     macroContentUpdated: function(domElement, macroCall) {
       var startMacroComment = domElement.previousSibling;
-      window.lastDomElement = domElement;
-      var serialization = this.serializeMacroCall(macroCall);
+      var serialization = CKEDITOR.plugins.get("xwiki-macro").serializeMacroCall(macroCall);
       if(! (startMacroComment && startMacroComment.nodeName == "#comment")) {
         startMacroComment = document.createComment(serialization);
         domElement.parentNode.insertBefore(startMacroComment, domElement);
