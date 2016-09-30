@@ -78,20 +78,33 @@
       // output: CKEDITOR.htmlParser.node[]
       var wrapMacroOutput = function(startMacroComment, output) {
         var wrapperName = isInlineMacro(startMacroComment, output) ? 'span' : 'div';
-        var wrapper = new CKEDITOR.htmlParser.element(wrapperName, {
-          'class': 'macro',
-          'data-macro': startMacroComment.value
-        });
+        var macroModule = null;
+        if(editor.config.macroModules && editor.config.macrodules[macroCall.name]) {
+          macroModule = editor.config.macrodules[macroCall.name];
+        }
+        var wrapper = macroModule ?  new CKEDITOR.htmlParser.element(wrapperName) :
+            new CKEDITOR.htmlParser.element(wrapperName, {
+              'class': 'macro',
+              'data-macro': startMacroComment.value
+            });
         if (output.length > 0) {
           for (var i = 0; i < output.length; i++) {
             output[i].remove();
             wrapper.add(output[i]);
           }
         } else {
-          // Use a placeholder for the macro output. The user cannot edit the macro otherwise.
-          var placeholder = new CKEDITOR.htmlParser.element(wrapperName, {'class': 'macro-placeholder'});
           var macroCall = macroPlugin.parseMacroCall(startMacroComment.value);
-          placeholder.add(new CKEDITOR.htmlParser.text('macro:' + macroCall.name));
+          var placeholder = null;
+          // a macroModule may be providing the services of editing these macros
+          if(macroModule) {
+            placeholder = macroModule.activate(phText, macroCall);
+          }
+          // If not provided, use a placeholder for the macro output so that the user can edit the macro .
+          if(!placeholder) {
+            placeholder = new CKEDITOR.htmlParser.element(wrapperName, {'class': 'macro-placeholder'});
+            var phText = new CKEDITOR.htmlParser.text('macro:' + macroCall.name);
+            placeholder.add(phText);
+          }
           wrapper.add(placeholder);
         }
 
@@ -235,6 +248,24 @@
         output.push(separator, macroCall.content);
       }
       return CKEDITOR.tools.escapeComment(output.join(''));
+    },
+
+    // updates the content of the comment at previousSibling
+    // (or creates it if not a startMacro comment
+    macroContentUpdated: function(domElement, macroCall) {
+      var startMacroComment = domElement.previousSibling;
+      window.lastDomElement = domElement;
+      var serialization = this.serializeMacroCall(macroCall);
+      if(! (startMacroComment && startMacroComment.nodeName == "#comment")) {
+        startMacroComment = document.createComment(serialization);
+        domElement.parentNode.insertBefore(startMacroComment, domElement);
+        var endMacroComment = document.createComment("stopmacro");
+        domElement.parentNode.insertBefore(endMacroComment, domElement.nextSibling);
+      } else {
+        startMacroComment.data = serialization;
+      }
     }
+
+
   });
 })();
