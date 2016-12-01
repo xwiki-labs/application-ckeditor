@@ -33,7 +33,7 @@
   <artifactId>application-ckeditor-pom</artifactId>
   <packaging>pom</packaging>
   <name>CKEditor Integration Parent POM</name>
-  <version>1.9-SNAPSHOT</version>
+  <version>1.11-SNAPSHOT</version>
   <description>Adds support for editing wiki pages using CKEditor.</description>
   <developers>
     <developer>
@@ -59,7 +59,7 @@
     </repository>
   </distributionManagement>
   <properties>
-    <ckeditor.version>4.5.10</ckeditor.version>
+    <ckeditor.version>4.6.0</ckeditor.version>
     <!-- The path to the folder where we clone the CKEditor sources. -->
     <ckeditor.path>${project.build.directory}/ckeditor-dev-${ckeditor.version}</ckeditor.path>
     <ckeditor.builder.path>${ckeditor.path}/dev/builder</ckeditor.builder.path>

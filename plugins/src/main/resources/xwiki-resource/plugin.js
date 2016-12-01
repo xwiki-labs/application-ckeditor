@@ -90,6 +90,8 @@ require(['jquery', 'resource', 'resourcePicker'], function ($, $resource) {
                 '<label class="cke_dialog_ui_labeled_label"></label>' +
                 '<input type="text" />' +
               '</div>',
+        // Focus the resource picker when the dialog is loaded.
+        tabIndex: 0,
         onLoad: function() {
           // Register the event listeners and create the resource picker. We register the changeResourceType listener
           // before creating the resource picker because we need to catch the first changeResourceType event in order to
@@ -105,10 +107,16 @@ require(['jquery', 'resource', 'resourcePicker'], function ($, $resource) {
           var resourceTypeDropDownToggle = this.getElement().findOne('.dropdown-toggle');
           var resourceTypeButton = this.getElement().findOne('button.resourceType');
           var resourceReferenceInput = this.getElement().findOne('input.resourceReference');
+          var tabIndex = this.tabIndex;
           [resourceTypeDropDownToggle, resourceTypeButton, resourceReferenceInput].forEach(function(field) {
             var dialog = this;
-            dialog.addFocusable(field, 0);
-            field._focusable = dialog._.focusList[0];
+            if (tabIndex >= 0 && tabIndex < dialog._.focusList.length) {
+              dialog.addFocusable(field, tabIndex);
+              field._focusable = dialog._.focusList[tabIndex];
+            } else {
+              dialog.addFocusable(field);
+              field._focusable = dialog._.focusList[dialog._.focusList.length - 1];
+            }
             field.on('focus', function() {
               dialog._.currentFocusIndex = this._focusable.focusIndex;
             });
@@ -117,11 +125,6 @@ require(['jquery', 'resource', 'resourcePicker'], function ($, $resource) {
           var id = CKEDITOR.tools.getNextId();
           resourceReferenceInput.setAttribute('id', id);
           this.getElement().findOne('label').setAttribute('for', id);
-          // Register the event listeners. Note that we register the event listeners after the resource picker was
-          // created because we don't care about the first changeResourceType and selectResource events since we're
-          // going to trigger them anyway when the dialog is shown by setting the value of the resource input.
-          $(this.getElement().$).on('changeResourceType', $.proxy(this, 'onResourceTypeChange'))
-            .on('selectResource', $.proxy(this, 'onSelectResource'));
         },
         validate: function() {
           var resourceReference = this.getValue();
@@ -149,17 +152,17 @@ require(['jquery', 'resource', 'resourcePicker'], function ($, $resource) {
           return resourceReference;
         },
         setValue: function(resourceReference) {
-          // Reset the input if no resource reference is provided.
+          // Reset the resource picker if no resource reference is provided.
           resourceReference = resourceReference || {
             type: this.resourceTypes[0],
-            reference: ''
+            reference: '',
+            // Make sure the picker doesn't try to resolve the empty reference.
+            isNew: true
           };
-          var serializedResourceReference = resourceReference.type + ':' + resourceReference.reference;
+          var serializedResourceReference = (resourceReference.type || '') + ':' + (resourceReference.reference || '');
           $(this.getResourcePickerInput().$).val(serializedResourceReference).trigger('selectResource', {
             reference: resourceReference
           });
-          // Clear the previously cached resource reference.
-          $(this.getElement().$).find('.resourcePicker').removeProp('previousResourceReference');
         },
         //
         // Custom fields

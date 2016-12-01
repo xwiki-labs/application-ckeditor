@@ -90,7 +90,7 @@
 #end
 
 #macro (importCKEditorCSS $path $evaluate)
-  #importCSS('org.xwiki.contrib' 'application-ckeditor-webjar' '1.9-SNAPSHOT' $path $evaluate)
+  #importCSS('org.xwiki.contrib' 'application-ckeditor-webjar' '1.11-SNAPSHOT' $path $evaluate)
 #end
 
 #macro (importCKEditorResources)
@@ -107,14 +107,20 @@
 
 #macro (ckeditor $parameters)
   #importCKEditorResources
+  #set ($sourceDocument = $tdoc)
+  #if ($parameters.attributes.get('data-sourceDocumentReference'))
+    #set ($sourceDocument = $xwiki.getDocument($parameters.attributes.get('data-sourceDocumentReference')))
+  #end
   #set ($source = {
-    'syntax': $doc.syntax,
+    'documentReference': $sourceDocument.documentReference,
+    'syntax': $sourceDocument.syntax,
     'content': $parameters.content
   })
   #set ($content = "#renderContentSheet")
-  #set ($discard = $parameters.attributes.put('class',
-    "$!parameters.attributes.get('class') ckeditor-textarea loading"))
-  #set ($parameters.attributes.spellcheck = false)
+  #set ($discard = $parameters.attributes.putAll({
+    'class': "$!parameters.attributes.get('class') ckeditor-textarea loading",
+    'spellcheck': false
+  }))
   &lt;textarea
     #foreach ($entry in $parameters.attributes.entrySet())
       $entry.key="$!escapetool.xml($entry.value)"
@@ -122,12 +128,56 @@
   &gt;$!escapetool.xml($content)&lt;/textarea&gt;
   #set ($escapedName = $escapetool.xml($parameters.attributes.name))
   &lt;input value="$!escapedName" name="RequiresHTMLConversion" type="hidden"/&gt;
-  &lt;input value="$!escapetool.xml($doc.syntax.toIdString())" name="$!{escapedName}_syntax" type="hidden"/&gt;
+  &lt;input value="$!escapetool.xml($sourceDocument.syntax.toIdString())" name="$!{escapedName}_syntax" type="hidden"/&gt;
   ## Chrome doesn't cache the enabled/disabled state of the form fields so we must store this state in the value of
   ## another form field. For instance, the enabled/disabled state of the RequiresHTMLConversion hidden input
   ## determines which editor mode (WYSIWYG vs. Source) is loaded initially.
   ## See CKEDITOR-34: Wiki syntax gets escaped when you click "Back" in the browser
   &lt;input value="" name="$!{escapedName}_cache" type="hidden" class="cache"/&gt;
+#end
+
+#macro (displayCKEditorConfigProperty $configDoc $propName $action)
+  &lt;dt&gt;
+    &lt;label&gt;$configDoc.displayPrettyName($propName)&lt;/label&gt;
+    &lt;span class="xHint"&gt;$services.localization.render("CKEditor.ConfigClass_${propName}.hint")&lt;/span&gt;
+  &lt;/dt&gt;
+  &lt;dd&gt;#displayCKEditorConfigPropertyValue($configDoc $propName $action)&lt;/dd&gt;
+#end
+
+#macro (displayCKEditorConfigBooleanProperty $configDoc $propName $action)
+  &lt;dt&gt;
+    &lt;label&gt;
+      #displayCKEditorConfigPropertyValue($configDoc $propName $action)
+      $configDoc.displayPrettyName($propName)
+    &lt;/label&gt;
+    &lt;span class="xHint"&gt;$services.localization.render("CKEditor.ConfigClass_${propName}.hint")&lt;/span&gt;
+  &lt;/dt&gt;
+  &lt;dd&gt;&lt;/dd&gt;
+#end
+
+#macro (displayCKEditorConfigPropertyValue $configDoc $propName $action)
+  #set ($output = $configDoc.display($propName, $action))
+  #set ($output = $stringtool.removeStart($output, '{{html clean="false" wiki="false"}}'))
+  #set ($output = $stringtool.removeEnd($output, '{{/html}}'))
+  $output
+#end
+
+#macro (displayCKEditorConfig $configDoc $action)
+  #set ($discard = $xwiki.ssx.use('CKEditor.ConfigSheet'))
+  #set ($discard = $xwiki.jsx.use('CKEditor.ConfigSheet'))
+  #importCSS('org.webjars' 'bootstrap-select' '1.11.2' 'css/bootstrap-select.min.css')
+  &lt;dl class="ckeditor-config#if ($configDoc.isNew()) new#end"&gt;
+    #displayCKEditorConfigProperty($configDoc 'removePlugins' $action)
+    #displayCKEditorConfigProperty($configDoc 'removeButtons' $action)
+    #displayCKEditorConfigBooleanProperty($configDoc 'linkShowAdvancedTab' $action)
+    #displayCKEditorConfigBooleanProperty($configDoc 'linkShowTargetTab' $action)
+    &lt;dt&gt;
+      &lt;label&gt;$configDoc.displayPrettyName('advanced')&lt;/label&gt;
+      &lt;span class="xHint"&gt;$services.localization.render('CKEditor.ConfigClass_advanced.hint',
+        ['&lt;a href="http://docs.ckeditor.com/#!/api/CKEDITOR.config"&gt;', '&lt;/a&gt;'])&lt;/span&gt;
+    &lt;/dt&gt;
+    &lt;dd&gt;#displayCKEditorConfigPropertyValue($configDoc 'advanced' $action)&lt;/dd&gt;
+  &lt;/dl&gt;
 #end
 {{/velocity}}</content>
 </xwikidoc>

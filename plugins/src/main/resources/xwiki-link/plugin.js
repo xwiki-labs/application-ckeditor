@@ -31,6 +31,8 @@
     requires: 'xwiki-marker,xwiki-resource',
 
     init: function(editor) {
+      // Remove the link markers (XML comments used by the XWiki Rendering to detect wiki links) when the content is
+      // loaded (toHtml), in order to protect them, and add them back when the content is saved (toDataFormat).
       editor.plugins['xwiki-marker'].addMarkerHandler(editor, 'wikilink', {
         // startLinkComment: CKEDITOR.htmlParser.comment
         // content: CKEDITOR.htmlParser.node[]
@@ -116,21 +118,31 @@
     if (!linkPlugin) {
       return;
     }
+    // Parse the link resource reference before the link dialog is opened.
     if (typeof linkPlugin.parseLinkAttributes === 'function') {
       var oldParseLinkAttributes = linkPlugin.parseLinkAttributes;
       linkPlugin.parseLinkAttributes = function(editor, element) {
+        // This is the data passed to the link dialog.
         var data = oldParseLinkAttributes.call(linkPlugin, editor, element);
-        var serializedResourceReference = element && element.getAttribute('data-reference');
-        if (serializedResourceReference) {
-          data.resourceReference = CKEDITOR.plugins.xwikiResource
-            .parseResourceReference(serializedResourceReference);
+        if (element) {
+          var serializedResourceReference = element.getAttribute('data-reference');
+          if (serializedResourceReference) {
+            data.resourceReference = CKEDITOR.plugins.xwikiResource.parseResourceReference(serializedResourceReference);
+          } else {
+            // Fall-back on URL or Path resource reference.
+            var reference = element.getAttribute('href') || '';
+            var type = reference.indexOf('://') < 0 ? 'path' : 'url';
+            data.resourceReference = {type: type, reference: reference};
+          }
         }
         return data;
       };
     }
+    // Serialize the link resource reference after the link dialog is closed.
     if (typeof linkPlugin.getLinkAttributes === 'function') {
       var oldGetLinkAttributes = linkPlugin.getLinkAttributes;
       linkPlugin.getLinkAttributes = function(editor, data) {
+        // The data comes from the link dialog.
         var attributes = oldGetLinkAttributes.call(linkPlugin, editor, data);
         var resourceReference = data.resourceReference;
         if (resourceReference) {
@@ -201,10 +213,8 @@
     // picker) to be focused when the dialog is opened.
     delete dialogDefinition.onFocus;
 
-    // The link dialog doesn't have a field to input or edit the link label (because the link label can be edited
-    // in-line) and it uses the link URL as the default label when there is no text or element (e.g. image) selected
-    // in the edited content. This is fine for the external (URL) links but for internal links it's nicer to use the
-    // resource label (e.g. the wiki page title or the attachment file name).
+    // Use the resource label (e.g. the wiki page title or the attachment file name) as the default link label when the
+    // link label text input is left empty.
     overwriteDefaultLinkLabel(dialogDefinition);
 
     resourcePlugin.updateResourcePickerOnFileBrowserSelect(dialogDefinition,
@@ -226,6 +236,8 @@
 
   var createResourcePicker = function(editor) {
     return CKEDITOR.plugins.xwikiResource.createResourcePicker({
+      // The resource picker is displayed after the link label input.
+      tabIndex: 1,
       resourceTypes: (editor.config['xwiki-link'] || {}).resourceTypes || ['doc', 'attach', 'url', 'mailto'],
       getValue: function() {
         var data = {resourceReference: this.base.getValue.apply(this, arguments)};
@@ -238,8 +250,14 @@
         return data.resourceReference;
       },
       setup: function(data) {
-        var resourceReference = data.resourceReference;
-        if (resourceReference && resourceReference.type === 'space' && this.resourceTypes.indexOf('space') < 0 &&
+        // Create a link to a new page if the resource reference is not provided.
+        var resourceReference = data.resourceReference || {
+          type: this.resourceTypes[0],
+          reference: this.getDialog().getParentEditor().getSelection().getSelectedText(),
+          // Make sure the picker doesn't try to resolve the link label as a resource reference.
+          isNew: true
+        };
+        if (resourceReference.type === 'space' && this.resourceTypes.indexOf('space') < 0 &&
             this.resourceTypes.indexOf('doc') >= 0) {
           // Convert the space resource reference to a document resource reference.
           resourceReference = {
@@ -287,6 +305,17 @@
         });
         dialog.getContentElement('info', 'optionsToggle').sync();
         dialog.layout();
+      },
+      onSelectResource: function(event, resource) {
+        this.base.onSelectResource.apply(this, arguments);
+        this.maybeUpdateLinkLabel();
+      },
+      maybeUpdateLinkLabel: function() {
+        var linkLabelField = this.getDialog().getContentElement('info', 'linkDisplayText');
+        if (linkLabelField.getValue() === '') {
+          // Use the resource label (e.g. the wiki page title or the attachment file name) as link label.
+          linkLabelField.setValue(this.getResourceLabel());
+        }
       }
     });
   };
@@ -391,27 +420,19 @@
   };
 
   /**
-   * Use the resource label as the default link label when creating a new link and there is no text or element (e.g.
-   * image) selected in the edited content.
+   * Use the resource label (e.g. the wiki page title or the attachment file name) as the default link label when the
+   * link label text input is left empty.
    */
   var overwriteDefaultLinkLabel = function(dialogDefinition) {
-    var oldOnOk = dialogDefinition.onOk;
-    dialogDefinition.onOk = function() {
-      if (!this._.selectedElement) {
-        // When creating a new link..
-        var editor = this.getParentEditor();
-        var range = editor.getSelection().getRanges()[0];
-        if (range.collapsed) {
-          // And there's no text or element (e.g. image) selected in the edited content..
-          var resourceLabel = this.getContentElement('info', 'resourceReference').getResourceLabel();
-          var textNode = new CKEDITOR.dom.text(resourceLabel, editor.document);
-          range.insertNode(textNode);
-          range.selectNodeContents(textNode);
-          range.select();
-        }
+    var linkLabelField = dialogDefinition.getContents('info').get('linkDisplayText');
+    var oldCommit = linkLabelField.commit;
+    linkLabelField.commit = function(data) {
+      if (this.getValue() === '') {
+        // Use the resource label (e.g. the wiki page title or the attachment file name) as link label.
+        this.setValue(this.getDialog().getContentElement('info', 'resourceReference').getResourceLabel());
       }
-      if (oldOnOk) {
-        oldOnOk.apply(this, arguments);
+      if (typeof oldCommit === 'function') {
+        oldCommit.apply(this, arguments);
       }
     };
   };

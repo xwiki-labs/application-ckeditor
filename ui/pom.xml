@@ -27,7 +27,7 @@
   <parent>
     <groupId>org.xwiki.contrib</groupId>
     <artifactId>application-ckeditor-pom</artifactId>
-    <version>1.9-SNAPSHOT</version>
+    <version>1.11-SNAPSHOT</version>
   </parent>
   <artifactId>application-ckeditor-ui</artifactId>
   <name>CKEditor Integration UI</name>
@@ -73,6 +73,20 @@
       <artifactId>xwiki-rendering-macro-html</artifactId>
       <version>${commons.version}</version>
       <scope>runtime</scope>
+    </dependency>
+    <!-- Used by the configuration section. -->
+    <dependency>
+      <groupId>org.webjars</groupId>
+      <artifactId>bootstrap-select</artifactId>
+      <version>1.11.2</version>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.xwiki.platform</groupId>
+      <artifactId>xwiki-platform-administration-ui</artifactId>
+      <version>${commons.version}</version>
+      <scope>runtime</scope>
+      <type>xar</type>
     </dependency>
   </dependencies>
   <build>
